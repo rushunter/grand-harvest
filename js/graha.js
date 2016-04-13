@@ -123,6 +123,26 @@ var GraHa = new function() {
             return result;
         };
 
+        this.getPlantCells = function() {
+            var result = new Array();
+            for(var i = 0; i < _cells.length; i++) {
+                if(_cells[i].contains() instanceof Plant) {
+                    result.push(_cells[i]);
+                }
+            }
+            return result;
+        };
+        
+        this.getWeedCells = function() {
+            var result = new Array();
+            for(var i = 0; i < _cells.length; i++) {
+                if(_cells[i].contains() instanceof Weed) {
+                    result.push(_cells[i]);
+                }
+            }
+            return result;
+        };
+
         this.getThreeRandomWeedCells = function() {
             var result = new Array();
 
@@ -308,10 +328,10 @@ var GraHa = new function() {
         this.isEnabled = function () {
             return _enabled;
         }
-
-        this.tryGrow = function () { _elem && _elem.tryGrow(); };
-
-        this.grow = function () { _elem && _elem.grow(); };
+        
+        this.tryGrow = function() {
+            _elem = _elem.tryGrow();
+        };
     }
 
     // --------------------------------------------------------------------------------------------------------
@@ -319,15 +339,19 @@ var GraHa = new function() {
     var ElementType = { PLANT: 0, WEED: 1 };
 
     function Element(type, name, prev, next, growSpeed, value) {
-        this.getType = function () { return type; }
+        this.getType = function () { return type; };
         this.getName = function() { return Localization.look(name); };
         var movesToGrow = growSpeed;
         this.tryGrow = function() {
-            if(--movesToGrow == 0) { grow(); }
-        }
-        this.slice = function () { return prev; }
-        this.value = function () { return value; }
+            if(--movesToGrow <= 0) { return grow(); }
+            return this;
+        };
+        this.slice = function () { return prev; };
+        this.value = function () { return value; };
 
+        this.help = function() {
+            --movesToGrow;
+        };
         function grow() { return next; }
     }
     
@@ -360,7 +384,7 @@ var GraHa = new function() {
             
     function Bucket() {
         this.prototype = new Item('Bucket of water', function() {
-
+            Core.water();
         });
     }
     function Fertilizers() {
@@ -384,11 +408,9 @@ var GraHa = new function() {
     var Rain = new Modifier('Rain', function() {
         
     }); 
-    
     var Drought = new Modifier('Drought', function() {
         
-    }); 
-
+    });
     var Thieves = new Modifier('Little Thieves', function() {
         
     }); 
@@ -414,6 +436,13 @@ var GraHa = new function() {
             var item = clearItem();
             if (item != null) {
                 item.activate();
+            }
+        };
+
+        this.water = function() {
+            var cells = Field.get2x2RandomNonFruitCells();
+            for(var i = 0; i < cells.length; i++) {
+                cells[i].contains().help();
             }
         };
 
@@ -447,9 +476,38 @@ var GraHa = new function() {
                 case PlayerType.PLAYER: whoMoves = PlayerType.CPU; break;
                 case PlayerType.CPU: whoMoves = PlayerType.PLAYER; break;
             }
-            if(!lucky && !goodLuck()) { return; }
+            growAll();
             
+            if(!lucky && !goodLuck()) { return; }
+            if(whoMoves === PlayerType.CPU) { cpuMove(); }
         };
+        
+        function cpuMove() {
+            //...
+        }
+        
+        function growAll() {
+            if(whoMoves === PlayerType.PLAYER) {
+                var cells = Field.getPlantCells();
+                cells.shuffle();
+                for(var i = 0; i < cells.length; i++) {
+                    setTimeout(function() {
+                        cells[i].tryGrow();
+                        View.refreshCell(cells[i]);
+                    }, 150);
+                }
+            }
+            else if(whoMoves === PlayerType.CPU) {
+                var cells = Field.getWeedCells();
+                cells.shuffle();
+                for(var i = 0; i < cells.length; i++) {
+                    setTimeout(function() {
+                        cells[i].tryGrow();
+                        View.refreshCell(cells[i]);
+                    }, 150);
+                }
+            }
+        }
         
         function goodLuck() {
             switch(whoMoves) {
@@ -655,7 +713,7 @@ var GraHa = new function() {
     
     var GameInfo = new function() {
         this.title = function() { return 'Grand Harvest'; };
-        this.version = function() { return '0.0.5'; };
+        this.version = function() { return '0.0.6'; };
     };
 };
 
