@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Arid Harvest</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        
+        <link rel="shortcut icon" href="icons/favicon.png" />
+        
+        <link rel="stylesheet" type="text/css" href="css/graha.css" />
+        <link rel="stylesheet" type="text/css" href="css/spinner.css" />
+        
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+        <script type="text/javascript" src="js/plugins/stringFormat.js"></script>
+        <script type="text/javascript" src="js/plugins/ion.sound.min.js"></script>
+        <script type="text/javascript" src="js/plugins/jquery.animate-colors-min.js"></script>
+        
+        <script type="text/javascript" src="js/graha.js"></script>
+        <script type="text/javascript" src="js/graha.localization.js"></script>
+        <script type="text/javascript" src="js/graha.test.js"></script>
+        
+
+    </head>
+    <body>
+        
+        <!-- Banners -->
+        <div class="banner" style="top:150px;left:10px;width:200px;height:400px">&nbsp;</div>
+        <div class="banner" style="top:560px;left:10px;width:200px;height:150px">&nbsp;</div>
+        <div class="banner" style="top:150px;right:10px;width:200px;height:250px">&nbsp;</div>
+        <div class="banner" style="top:410px;right:10px;width:200px;height:300px">&nbsp;</div>
+
+        <div id="container">
+        <div id="container-inner">
+        
+            <div class="cover cover1"></div>
+            <div class="cover cover2"></div>
+            <div id="logo"></div>
+<!--            <div id="load"></div>-->
+            
+            <div id="topPanel">
+                
+                <div id="inventory"></div>
+                <div id="skipButton"></div>
+                <div id="inventoryButton"></div>
+                <div id="menuButton"></div>
+            </div>                
+            <div id="scoreLabel">0</div>
+
+                 <!-- Progress Indicator -->
+    <!--            <div class="progress-bar">
+                    <canvas id="activeProgress" class="progress-active"></canvas>
+                </div>-->
+    
+            <div id="mainMenu">
+                <div class="mainMenu label"> </div>
+                <div class="mainMenu button achievementsButton" style="top: 40px;"></div>
+                <div class="mainMenu button highscoresButton" style="top: 50px;"></div>
+                <div class="mainMenu button showSettingsButton" style="top: 60px;"></div>
+                <div class="mainMenu button closeButton" style="top: 70px;"></div>
+            </div>
+
+            <div id="gameField">&nbsp;</div>
+            
+            <div id="version"></div>
+        </div>
+        </div>
+        
+        <!-- Tutorial -->
+        <div id="tutorialWindow">
+            <div></div>
+        </div>
+        
+        <!-- Achievement Notification -->
+        <div id="achievementNotification"></div>
+        
+       
+        
+        <!-- achievement -->
+        <div id="achievement" hidden>
+            <div class="image">&nbsp;</div>
+            <div class="achievementLabel">
+                <div class="title">Achievement!</div>
+                <div class="description">This is an achievement.</div>
+            </div>
+        </div>
+        
+        <div id="blind"></div>
+        
+        <!-- Score Dialog -->
+        <div id="scoreDialog" class="dialog">
+            <p class="scoreDialog gameoverLabel dialogTitle">Game over!</p>
+            <p class="scoreDialog label">Your score:</p>
+            <div class="scoreDialog countLabel">0</div>
+            <div class="scoreDialog newHSLabel">&nbsp;<span>New High Score!</span>&nbsp;</div>
+            <div class="scoreDialog closeButton dialogButton">Close</div>
+        </div>
+        
+        <!-- Settings Dialog -->
+        <div id="settingsDialog" class="dialog">
+            <p class="settingsDialog dialogTitle">Settings</p>
+            <span class="settingsDialog langLabel label">Language: </span>
+            <div class="settingsDialog langButton dialogButton" style="background-image:url(icons/flags/en.png)"></div>
+            <div class="settingsDialog closeButton dialogButton">Close</div>
+        </div>
+        
+        <!-- Achievements Dialog -->
+        <div id="achievementsDialog" class="dialog">
+            <p class="achievementsDialog dialogTitle">Achievements</p>
+            <div class="achievementsDialog entriesArea"></div>
+            <div class="achievementsDialog dialogButton closeButton">Close</div>
+        </div>
+    
+        <div id="messageBar"></div>
+
+    </body>
+</html>
