@@ -1,9 +1,13 @@
+$(function() {
+
 /*
- * Öâåòà:
- * ôîí - #ffeda9
- * èêîíêà èíâåíòàðÿ - #eccc9a
- * òåêñò - #6b4d1c
+ * ����� :
+ * ��� - #ffeda9
+ *  - #eccc9a
+ * - #6b4d1c
  */
+
+/* global cellHtml */
 
 Array.prototype.shuffle = function () {
     for (var j, x, i = this.length; i; j = parseInt(Math.random() * i), x = this[--i], this[i] = this[j], this[j] = x)
@@ -18,6 +22,18 @@ String.prototype.format = function () {
                 : match
                 ;
     });
+};
+
+var GUID = new function () {
+
+    function s(cnt) {
+        var segm = '';
+        while (cnt-- > 0) { segm += (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1); }
+        return segm.toUpperCase();
+    }
+
+    this.getNew = function () { return [s(2), s(1), s(1), s(1), s(3)].join('-'); };
+    this.getSix = function() { return s(2).substr(0,6); };
 };
 
 var Score = 0;
@@ -67,10 +83,23 @@ var GameMode = {
     ENDLESS: 1,
     EXTREME: 2
 };
+var ElementType = {
+    PLANT: 10, 
+    SEED: 11,
+    FLOWER: 12,
+    FRUIT: 13,
+    WEED: 20,
+    WEED_SMALL: 21,
+    WEED_MEDIUM: 22,
+    WEED_LARGE: 23
+};
 
 // --------------------------------------------------------------------------------------------------------
 
 var Field = new function () {
+    
+    var m_this = this;
+    
     var FIELD_WIDTH = 7;
     var FIELD_HEIGHT = 9;
 
@@ -78,57 +107,114 @@ var Field = new function () {
         return [FIELD_WIDTH, FIELD_HEIGHT];
     };
 
-    var _cells = new Array();
+    var _cells = new Object();
+    var _cellsXY = new Array();
     var _selectedCell = null;
 
     function _init() {
         for (var x = 0; x < FIELD_WIDTH; x++) {
-            _cells[x] = new Array();
+            _cellsXY[x] = new Array();
             for (var y = 0; y < FIELD_HEIGHT; y++) {
-                _cells[x][y] = new Cell(x, y);
+                var elem = null;
+                if(x == 1 && y == FIELD_HEIGHT - 2) { elem = Fruit(); }
+                if(x == FIELD_WIDTH - 2 && y == 1) { elem = Weed_medium(); }
+                var cell = new Cell(x, y, elem);
+                _cells[cell.id()] = cell;
+                _cellsXY[x][y] = cell;
             }
         }
     }
 
-    function getCellsOnGrid(cell, grid) {
-        if (!(cell instanceof Cell)) {
+    this.refreshCells = function() {
+        for(var k in _cells) {
+            if(_cells.hasOwnProperty(k)) { _cells[k].refresh(); }
+        }
+    };
+
+    this.getCell = function(id) {
+        return _cells[id];
+    };
+
+    this.getIds = function() {
+        var sortArr = new Array();
+        for (var k in _cells) {
+            if(_cells.hasOwnProperty(k)) { 
+                sortArr.push({
+                    id:_cells[k].id(), 
+                    x:_cells[k].x(), 
+                    y:_cells[k].y()
+                });
+            }
+        }
+        sortArr.sort(function(a, b) {
+            if(a.y < b.y) { return -1; }
+            if(a.y > b.y) { return 1; }
+            if(a.y == b.y) {
+                if(a.x < b.x) { return -1; }
+                if(a.x > b.x) { return 1; }
+                return 0;
+            }
+        });
+        
+        var result = new Array();
+        
+        for(var i = 0; i < sortArr.length; i++) {
+            result.push(sortArr[i].id);
+        }
+        return result;
+    };
+
+    function getCellsOnGrid(id, grid) {
+        if (!_cells.hasOwnProperty(id) || !(_cells[id] instanceof Cell)) {
             return [];
         }
 
-        var x = cell.x();
-        var y = cell.y();
+        var cell = _cells[id];
+        var x0 = cell.x();
+        var y0 = cell.y();
         var result = new Array();
         for (var i = 0; i < grid.length; i++) {
             if (!(grid[i] instanceof Array) || grid[i].length != 2) {
                 return [];
             }
-            var x = cell.x() + grid[i][0];
-            var y = _cell.y() + grid[i][1];
+            var x = x0 + grid[i][0];
+            var y = y0 + grid[i][1];
             if (x >= 0 && x < FIELD_WIDTH && y >= 0 && y < FIELD_HEIGHT) {
-                result.push(_cells[x][y]);
+                result.push(_cellsXY[x][y]);
             }
         }
         return result;
     }
 
-    this.getNearNeigbors = function getNearNeigbors(cell) {
+    this.getNearNeigbors = function getNearNeigbors(id) {
         var grid = [[0, -1][1, 0][0, 1][-1, 0]];
-        return getCellsOnGrid(cell, grid);
+        return getCellsOnGrid(id, grid);
     };
 
-    this.getFarNeigbors = function getFarNeigbors(cell) {
+    this.getFarNeigbors = function getFarNeigbors(id) {
         var grid = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-        return getCellsOnGrid(cell, grid);
+        return getCellsOnGrid(id, grid);
     };
 
-    this.getAllNeigbors = function getAllNeigbors(cell) {
+    this.getAllNeigbors = function getAllNeigbors(id) {
         var grid = [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
-        return getCellsOnGrid(cell, grid);
+        return getCellsOnGrid(id, grid);
     };
 
-    function get3RandomEmptyNeigbors() {
+    this.getEmptyNeigbors = function(id) {
         var result = [];
-        var cells = getAllNeigbors();
+        var nbrs = m_this.getAllNeigbors(id);
+        for(var i = 0; i < nbrs.length; i++) {
+            if(nbrs[i].isEmpty()) {
+                result.push(nbrs[i]);
+            }
+        }
+        return result;
+    };
+
+    function get3RandomEmptyNeigbors(id) {
+        var result = [];
+        var cells = getAllNeigbors(id);
         cells.shuffle();
         for (var i = 0; i < cells.length; i++) {
             if (cells.contains() === null) {
@@ -141,17 +227,21 @@ var Field = new function () {
         return result;
     }
 
-    this.getDistance = function (c0, c1) {
+    this.getDistance = function (id0, id1) {
+        var c0 = _cells[id0];
+        var c1 = _cells[id1];
         if (!(c0 instanceof Cell) || !(c1 instanceof Cell)) {
             return;
         }
-        return Math.max(Math.abs(c1.x() - c0.x()), Math.abs(c1.y() - c0.y()));
-    }
+        return Math.sqrt(Math.pow(Math.abs(c1.x() - c0.x()), 2) + Math.pow(Math.abs(c1.y() - c0.y()), 2));
+    };
 
-    this.getCellValue = function (cell) {
+    this.getCellValue = function (id) {
+        var cell = _cells[id];
+        if (!(cell instanceof Cell)) { return 0; }
         var result = cell.value();
-        var nn = getNearNeigbors(cell);
-        var fn = getFarNeigbors(cell);
+        var nn = getNearNeigbors(id);
+        var fn = getFarNeigbors(id);
 
         for (var i = 0; i < nn.length; i++) {
             if (nn.type() === cell.type()) {
@@ -179,9 +269,9 @@ var Field = new function () {
 
     this.getWeedCells = function () {
         var result = new Array();
-        for (var i = 0; i < _cells.length; i++) {
-            if (_cells[i].contains() instanceof Weed) {
-                result.push(_cells[i]);
+        for (var k in _cells) {
+            if (_cells.hasOwnProperty(k) && _cells[k].contains() && _cells[k].contains().is(ElementType.WEED)) {
+                result.push(_cells[k]);
             }
         }
         return result;
@@ -224,7 +314,7 @@ var Field = new function () {
         }
 
         return [];
-    }
+    };
 
     this.get2x2RandomPlantCells = function () {
         var result = new Array();
@@ -332,9 +422,10 @@ var Field = new function () {
         return result;
     };
 
-    this.cellClicked = function (x, y) {
-        //ïðîâåðêà...
-        var cell = _cells[x][y];
+    this.cellClicked = function (id) {
+        //ïðîâåðê� ...
+        var cell = _cells[id];
+        if (!(cell instanceof Cell)) { return; }
         if (cell.isSelected()) {
             cell.unselect();
             _selectedCell = null;
@@ -365,19 +456,28 @@ var Field = new function () {
         }
 
     };
+    
+    this.getNonEmptyCells = function() {
+        var result = new Object();
+        for(var k in _cells) {
+            if(_cells.hasOwnProperty(k) && !_cells[k].isEmpty()) {
+                result[k] = _cells[k].contains();
+            }
+        }
+        return result;
+    };
 
     _init();
 };
 
-function Cell(cX, cY) {
+function Cell(cX, cY, elem) {
 
-    function self() {
-        return this;
-    }
+    var m_this = this;
 
-    var _elem = null;
-    var _enabled = true;
+    var _id = GUID.getSix();
+    var _elem = elem ? elem : null;
     var _selected = false;
+    var _disabledIn = 0;
 
     this.contains = function () {
         return _elem;
@@ -390,35 +490,47 @@ function Cell(cX, cY) {
         return cY;
     };
 
+    this.id = function() { return _id; };
+
+    this.refresh = function() {
+        var wasDisabled = !isEnabled();
+        if(_disabledIn > 0) { _disabledIn--; }
+        if(wasDisabled && isEnabled()) {
+            enable();
+        }
+        tryGrow();
+    }
+
     this.fill = function (elem) {
         if (!(elem instanceof Element)) {
             Error.init('90AD8D84803A');
             return;
         }
         _elem = elem;
-        View.fillCell(cX, cY, elem);
+        View.fillCell(_id, elem);
     };
 
     this.clear = function () {
         _elem = null;
-        View.clearCell(cX, cY);
+        View.clearCell(_id);
     };
 
-    this.disable = function () {
+    this.disable = function disable() {
         self().clear();
-        _enabled = false;
+        _disabledIn = 3;
+        View.disableCell(_id);
     };
 
-    this.enable = function () {
-        _enabled = true;
+    this.enable = function enable() {
+        View.enableCell(_id);
     };
 
     this.isEmpty = function () {
         return _elem === null;
     };
 
-    this.isEnabled = function () {
-        return _enabled;
+    this.isEnabled = function isEnabled() {
+        return _disabledIn == 0;
     };
 
     this.select = function () {
@@ -433,74 +545,84 @@ function Cell(cX, cY) {
         return _selected;
     };
 
-    this.tryGrow = function () {
-        _elem = _elem.tryGrow();
+    this.tryGrow = function tryGrow() {
+        if(_elem === null) { return; }
+        var elem = _elem.tryGrow();
+        if(elem !== null) {
+            _elem = elem;
+            View.fillCell(_id, elem);
+        }
+    };
+    
+    this.slice = function() {
+        _elem = m_this.fill(_elem.slice());
     };
 }
 
 // --------------------------------------------------------------------------------------------------------
 
-var ElementType = {PLANT: 0, WEED: 1};
-
-function Element(type, name, prev, next, growSpeed, value) {
-    this.getType = function () {
-        return type;
+function Element(types, name, next, growSpeed, value) {
+    this.getTypes = function () {
+        return types;
     };
     this.getName = function () {
         return Localization.look(name);
     };
     var movesToGrow = growSpeed;
+    this.is = function(t) {
+        for(var i = 0; i < types.length; i++) {
+            if(types[i] === t) { return true; }
+        }
+        return false;
+    };
     this.tryGrow = function () {
         if (--movesToGrow <= 0) {
             return grow();
         }
-        return this;
-    };
-    this.slice = function () {
-        return prev;
+        return null;
     };
     this.value = function () {
         return value;
     };
+    this.getIcon = function (initSize) {
+        var sizes = [512, 256, 128, 64, 48, 32, 16];
+        var size = sizes[sizes.length - 1];
+        for(var i = 0; i < sizes.length - 1; i++) {
+            if(sizes[i] <= initSize) { 
+                size = sizes[i];
+                break;
+            }
+        }
+        return 'img/' + size + '/' + name.toLowerCase().replace(/ /g, '-') + '.png';
+    };
+
 
     this.help = function () {
         --movesToGrow;
     };
     function grow() {
-        return next;
+        return next();
     }
 }
 
-// --------------------------------------------------------------------------------------------------------
-
-function Plant(name, prev, next, growSpeed, value) {
-    this.prototype = new Element(ElementType.PLANT, name, prev, next, growSpeed, value);
-}
-
 function Seed() {
-    this.prototype = new Plant('Seed', null, new Flower(), 2, 18);
+    return new Element([ElementType.PLANT, ElementType.SEED], 'Seed', Flower, 2, 18);
 }
 function Flower() {
-    this.prototype = new Plant('Flower', new Seed(), new Fruit(), 5, 24);
+    return new Element([ElementType.PLANT, ElementType.FLOWER], 'Flower', Fruit, 5, 24);
 }
 function Fruit() {
-    this.prototype = new Plant('Fruit', new Flower(), new Fruit(), 1, 51);
-}
-
-// --------------------------------------------------------------------------------------------------------
-
-function Weed(name, prev, next, growSpeed) {
-    this.prototype = new Element(ElementType.WEED, name, prev, next, growSpeed);
+    return new Element([ElementType.PLANT, ElementType.FRUIT], 'Fruit', Fruit, 1, 51);
 }
 
 function Weed_small() {
-    this.prototype = new Weed('Weed Small', null, new Weed_medium(), 4, 12);
+    return new Element([ElementType.WEED, ElementType.WEED_SMALL], 'Weed Small', Weed_medium, 4, 12);
 }
 function Weed_medium() {
-    this.prototype = new Weed('Weed Medium', new Weed_small(), new Weed_large(), 6, 30);
+    return new Element([ElementType.WEED, ElementType.WEED_MEDIUM], 'Weed Medium', Weed_large, 6, 30);
 }
 function Weed_large() {
-    this.prototype = new Weed('Weed Large', new Weed_medium(), new Weed_large(), 1, 51);
+    return new Element([ElementType.WEED, ElementType.WEED_LARGE], 'Weed Large', Weed_large, 1, 51);
 }
 
 // --------------------------------------------------------------------------------------------------------
@@ -551,16 +673,65 @@ var Thieves = new Modifier('Little Thieves', function () {
 
 var Core = new function () {
 
-    function self() {
-        return this;
-    }
+    var m_this = this;
 
     var PlayerType = {PLAYER: 0, CPU: 1};
 
-    var whoMoves = PlayerType.PLAYER;
+    var _whoMoves = PlayerType.PLAYER;
+
+    function cpuMove() {
+        //...
+        m_this.nextMove();
+    }
+
+    function growAll() {
+        if (_whoMoves === PlayerType.PLAYER) {
+            var cells = Field.getPlantCells();
+            cells.shuffle();
+            for (var i = 0; i < cells.length; i++) {
+                setTimeout(function () {
+                    cells[i].tryGrow();
+                    View.refreshCell(cells[i]);
+                }, 150);
+            }
+        }
+        else if (_whoMoves === PlayerType.CPU) {
+            var cells = Field.getWeedCells();
+            cells.shuffle();
+            for (var i = 0; i < cells.length; i++) {
+                setTimeout(function () {
+                    cells[i].tryGrow();
+                    View.refreshCell(cells[i]);
+                }, 150);
+            }
+        }
+    }
+
+    function goodLuck() {
+        switch (_whoMoves) {
+            case PlayerType.PLAYER:
+                if (Drought.check()) {
+                    m_this.nextMove(true);
+                    return false;
+                }
+                if (Thieves.check()) {
+                    m_this.thieves();
+                    return true;
+                }
+                break;
+            case PlayerType.CPU:
+                if (Rain.check()) {
+                    m_this.nextMove(true);
+                    return false;
+                }
+                break;
+        }
+        return true;
+    }
 
     this.playerMoves = function () {
-        return whoMoves === PlayerType.PLAYER;
+        //return true;
+        return _whoMoves === PlayerType.PLAYER;
     };
 
     this.setItem = function (item) {
@@ -601,7 +772,7 @@ var Core = new function () {
         }
     };
 
-    this.thieves = function thieves() {
+    this.thieves = function () {
         var cells = Field.getFruitCells();
         cells.shuffle();
         for (var i = 0; i < cells.length * (Math.random() * 0.17 + 0.33); i++) {
@@ -610,13 +781,15 @@ var Core = new function () {
         }
     };
 
-    this.nextMove = function nextMove(lucky) {
-        switch (whoMoves) {
+    this.nextMove = function (lucky) {
+        switch (_whoMoves) {
             case PlayerType.PLAYER:
-                whoMoves = PlayerType.CPU;
+                _whoMoves = PlayerType.CPU;
+                MessageManager.init(MessageType.WARNING, Localization.look('cpu moves'));
                 break;
             case PlayerType.CPU:
-                whoMoves = PlayerType.PLAYER;
+                _whoMoves = PlayerType.PLAYER;
+                MessageManager.init(MessageType.INFO, Localization.look('your move!'));
                 break;
         }
         growAll();
@@ -624,63 +797,46 @@ var Core = new function () {
         if (!lucky && !goodLuck()) {
             return;
         }
-        if (whoMoves === PlayerType.CPU) {
+        if (_whoMoves === PlayerType.CPU) {
             cpuMove();
         }
     };
 
-    this.cellCkicked = function (x, y) {
-        Field.cellClicked(x, y);
+    this.cellClicked = function (id) {
+        Field.cellClicked(id);
     };
 
-    function cpuMove() {
-        //...
-    }
+    this.destroy = function() {
+        View.destroy();
+    };
 
-    function growAll() {
-        if (whoMoves === PlayerType.PLAYER) {
-            var cells = Field.getPlantCells();
-            cells.shuffle();
-            for (var i = 0; i < cells.length; i++) {
-                setTimeout(function () {
-                    cells[i].tryGrow();
-                    View.refreshCell(cells[i]);
-                }, 150);
-            }
-        }
-        else if (whoMoves === PlayerType.CPU) {
-            var cells = Field.getWeedCells();
-            cells.shuffle();
-            for (var i = 0; i < cells.length; i++) {
-                setTimeout(function () {
-                    cells[i].tryGrow();
-                    View.refreshCell(cells[i]);
-                }, 150);
-            }
-        }
-    }
+    
+};
 
-    function goodLuck() {
-        switch (whoMoves) {
-            case PlayerType.PLAYER:
-                if (Drought.check()) {
-                    nextMove(true);
-                    return false;
-                }
-                if (Thieves.check()) {
-                    thieves();
-                    return true;
-                }
-                break;
-            case PlayerType.CPU:
-                if (Rain.check()) {
-                    nextMove(true);
-                    return false;
-                }
-                break;
+var EventsManager = new function() {
+
+    var DeviceType = {
+        DESKTOP: 0,
+        MOBILE: 1
+    };
+
+    var _device = (true) ? DeviceType.DESKTOP : DeviceType.MOBILE;
+
+    var list = new Object(); 
+    list[DeviceType.DESKTOP] = {};
+    list[DeviceType.MOBILE] = {
+        'mousedown': 'taphold',
+        'click': 'tap'
+    };
+    
+    this.get = function(value) {
+        if (typeof list[_device][value] == 'string') {
+            return list[_device][value];
         }
-        return true;
-    }
+        else {
+            return value;
+        }
+    };
 };
 
 var MessageType = new function () {
@@ -699,20 +855,118 @@ var MessageType = new function () {
 };
 
 var View = new function () {
-    function self() {
-        return this;
-    }
+    var m_this = this;
+    
+    var cellHtml = '<div id={0} class="fieldCell{1}"></div>';
 
     function _init() {
+        var size = Field.getSize();
+        var ids = Field.getIds();
+        var resultHtml = '';
+        for(var y = 0; y < size[1]; y++) {
+            for(var x = 0; x < size[0]; x++) {
+                var className = '';
+                if(x == 0) {
+                    className += ' beginRow';
+                    if(y == 0) { className += ' nw'; }
+                    if(y == size[1] - 1) { className += ' sw'; }
+                }
+                else if(x == size[0] - 1) {
+                    className += ' endRow';
+                    if(y == 0) { className += ' ne'; }
+                    if(y == size[1] - 1) { className += ' se'; }
+                }
+                resultHtml += cellHtml.format(ids[y * size[0] + x], className);
+            }
+        }
+        $('#gameField').html(resultHtml);
         _events();
+        var cells = Field.getNonEmptyCells();
+        for(var k in cells) {
+            if(cells.hasOwnProperty(k)) {
+                m_this.fillCell(k, cells[k]);
+            }
+        }
     }
 
     function _events() {
-        $('body').click('.fieldCell', function () {
-            Core.cellClicked($(this).attr('x'), $(this).attr('y'));
+
+        var _pressed = false;
+        
+
+        $(document).delegate(".fieldCell", "scrollstart", false);
+
+        var _selectedCells = [];
+        var _selectCount = 0;
+        var _selectedType = null;
+        var _selectTimeout = null;
+        var _neigbors = null;
+
+        $(document).on(EventsManager.get('click'), '.fieldCell', function (event) {
+            
+            if(!Core.playerMoves()) { return; }
+            
+            clearTimeout(_selectTimeout);
+            _selectTimeout = null;
+            
+            var $cell = $(this);
+            var cell = Field.getCell($cell[0].id);
+            var elem = cell.contains();
+            
+            if(cell.isEmpty()) {
+                if(_selectedCells.indexOf(cell) == -1) {
+                    if(_selectCount > 0 && _neigbors.indexOf(cell) != -1) {
+                        _selectedCells.push(cell);
+                        _selectCount--;
+                        $cell.addClass('selected');
+                        if(_selectCount == 0 || _selectedCells.length == _neigbors.length) {
+                            _selectTimeout = setTimeout(function() {
+                                $('.fieldCell').removeClass('selected').removeClass('selectedPrimary');
+                                for(var i = 0; i < _selectedCells.length; i++) {
+                                    var cell = _selectedCells[i];
+                                    if(i === 0 && cell.contains().is(ElementType.SEED)) { 
+                                        cell.clear();
+                                        continue; 
+                                    }
+                                    cell.fill(new Seed());
+                                }
+                                _selectedType = null;
+                                _selectCount = 0;
+                                _selectedCells.splice(0, _selectedCells.length);
+                                Core.nextMove();
+                            }, 300);
+                        }
+                    }
+                }
+                else {
+                    _selectedCells.splice(_selectedCells.indexOf(cell), 1);
+                    _selectCount++;
+                    $cell.removeClass('selected');
+                }
+            } 
+            else if(elem.is(ElementType.PLANT)){
+                $('.fieldCell').removeClass('selected').removeClass('selectedPrimary');
+                if(_selectedCells.indexOf(cell) == -1) {
+                    _selectedCells.push(cell);
+                    _selectedType = elem.getTypes()[1];
+                    if(elem.is(ElementType.FRUIT)) {
+                        _selectCount = 3;
+                    }
+                    else {
+                        _selectCount = 1;
+                    }
+                    _neigbors = Field.getEmptyNeigbors(cell.id());
+                    $cell.addClass('selectedPrimary');
+                }
+                else {
+                    _selectedType = null;
+                    _selectCount = 0;
+                    _selectedCells.splice(0, _selectedCells.length);
+                }
+            }
         });
 
-        $('body').click('.activeItem', function () {
+        $(document).on(EventsManager.get('click'), '.activeItem', function () {
             if (!Core.playerMoves()) {
                 return;
             }
@@ -721,81 +975,129 @@ var View = new function () {
         });
 
         var skipTimeout = null;
-        $('body').mousedown('#skipMoveButton', function () {
+        $('#skipMoveButton').on(EventsManager.get('mousedown'), function (event) {
+            event.preventDefault();
             if (!Core.playerMoves()) {
                 return;
             }
+            $('#skipMoveButton > .red-blind').css('height', 0).animate({
+                'width': '100%',
+                'height': '100%'
+            }, 900).delay(100).animate({
+                'width': 0,
+                'height': 0
+            }, 0);
             skipTimeout = setTimeout(function () {
                 Core.nextMove(true);
-            }, 1500);
+            }, 1000);
         });
-        $('body').mouseup('#skipMoveButton', function () {
+        $('#skipMoveButton').mouseup(function () {
+            if (!Core.playerMoves()) {
+                return;
+            }
             clearTimeout(skipTimeout);
             skipTimeout = null;
+            $('#skipMoveButton > .red-blind').stop().css({
+                'width': 0,
+                'height': 0
+            });
         });
+    }
+
+    function _eventsOff() {
+        $(document).off('mousedown', '.fieldCell');
+        $(document).off('mouseup', '.fieldCell');
+        $(document).off('mouseover', '.fieldCell');
+        $(document).off('click', '.activeItem');
+        $(document).off('mousedown', '#skipMoveButton');
+        $(document).off('mouseup', '#skipMoveButton');
     }
 
     this.showDialog = function (msgType, text) {
         $('#messageBar')
-                .css({
-                    'bottom': '-30px',
-                    'background-color': msgType.getColor()
-                })
-                .html(text)
-                .show()
-                .animate({
-                    'bottom': 0
-                }, 300)
-                .delay(3000)
-                .fadeOut(300);
+        .css({
+            'bottom': '-30px',
+            'background-color': msgType.getColor()
+        })
+        .html(text)
+        .show()
+        .animate({
+            'bottom': 0
+        }, 300)
+        .delay(3000)
+        .fadeOut(300);
     };
 
-    this.fillCell = function (x, y, elem) {
-        var fieldSize = Field.getSize();
-        if (x < 0 || x >= fieldSize[0] || y < 0 || y >= fieldSize[1]) {
-            Error.init('B482D3CD7F38', [x, y]);
+    this.fillCell = function (id, elem) {
+        if ($('#'+id).length == 0) {
+            Error.init('B482D3CD7F38');
             return;
         }
-        $('.fieldCell').eq(y * fieldSize[0] + x).html('<img class="elem" src="' + elem.iconSmall + '" />');
+        $('#'+id).html('<img class="elem" src="' + elem.getIcon(50) + '" />');
     };
 
-    this.clearCell = function (x, y) {
+    this.clearCell = function (id) {
         var fieldSize = Field.getSize();
-        if (x < 0 || x >= fieldSize[0] || y < 0 || y >= fieldSize[1]) {
-            Error.init('B482D3CD7F38', [x, y]);
+        if ($('#'+id).length == 0) {
+            Error.init('B482D3CD7F38');
             return;
         }
-        $('.fieldCell').eq(y * fieldSize[0] + x).empty();
+        $('#'+id).empty();
     };
 
     this.activateItem = function () {
 
     };
 
-    this.disableCell = function (x, y) {
-        self().clearCell(x, y);
-        $('.fieldCell[x="' + x + '"][y="' + y + '"]').addClass('disabled');
+    this.disableCell = function (id) {
+        if ($('#'+id).length == 0) {
+            Error.init('B482D3CD7F38');
+            return;
+        }
+        $('#'+id).addClass('disabled');
     };
 
-    this.enableCell = function (x, y) {
-        $('.fieldCell[x="' + x + '"][y="' + y + '"]').removeClass('disabled');
+    this.enableCell = function (id) {
+        if ($('#'+id).length == 0) {
+            Error.init('B482D3CD7F38');
+            return;
+        }
+        $('#'+id).removeClass('disabled');
     };
 
-    this.refreshCell = function (cell) {
+    this.refreshCell = function (id) {
+        
     };
+
+    this.destroy = function() {
+        _eventsOff();
+        $('body').find('*:not(#messageBar)').remove();
+        Error.init('000000000000');
+    }
 
     _init();
 };
 
 var AchievementManager = new function () {
 
+    function Achievement(name, description) {
+        this.name = name;
+        this.description = description;
+        var _unlocked = false;
+        this.unlock = function () { _unlocked = true; };
+        this.unlocked = function () { return _unlocked; }
+    }
+
     var _ach = {
-        'ED3DA55C0040': 'First steps'
+        'ED3DA55C0040': new Achievement('First steps', '')
     };
 
     this.init = function (code) {
-        if (typeof _ach[code.toUpperCase] == 'string') {
-            MessageManager.init(MessageType.SUCCESS, '<span style="font-weight:bold">' + Localization.look('Achievement unlocked!') + '</span> ' + Localization.look(_ach[code]));
+        var a = _ach[code.toUpperCase];
+        if (a instanceof 'Achievement' && !a.unlocked()) {
+            a.unlock();
+            var msg = '<span style="font-weight:bold">' + Localization.look('Achievement unlocked!') + '</span> ' + Localization.look(a.name);
+            MessageManager.init(MessageType.SUCCESS, msg);
         }
     };
 
@@ -804,17 +1106,25 @@ var AchievementManager = new function () {
 var Error = new function () {
 
     var _errors = {
+        '000000000000': 'Unknown Error',
         '0E755B21589E': 'Connection with server lost',
         '7065F38DB467': '"{0}" is not a correct color',
         '90AD8D84803A': 'Incorrect element',
         '7D1902C804C5': 'Incorrect item',
-        'B482D3CD7F38': 'Cell coordinates ({0}, {1}) are out of bounds'
+        'B482D3CD7F38': 'Cell doesn\'t exist'
     };
+    
+    var _criticalErrors = ['000000000000', '7065F38DB467', '90AD8D84803A', '7D1902C804C5', 'B482D3CD7F38'];
 
     this.init = function (code, args) {
+        var message = 'Unknown Error';
         if (typeof _errors[code.toUpperCase()] == 'string') {
-            MessageManager.init(MessageType.ERROR, _errors[code].format(args));
+            message = _errors[code].format(args);
         }
+        if(_criticalErrors.indexOf(code) != -1) {
+            Core.destroy();
+        }
+        MessageManager.init(MessageType.ERROR, message);
     };
 
 
@@ -855,6 +1165,7 @@ var GameInfo = new function () {
         return 'Grand Harvest';
     };
     this.version = function () {
-        return '0.0.7';
+        return '0.0.8';
     };
 };
+});
