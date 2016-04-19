@@ -187,7 +187,7 @@ var Field = new function () {
     }
 
     this.getNearNeigbors = function getNearNeigbors(id) {
-        var grid = [[0, -1][1, 0][0, 1][-1, 0]];
+        var grid = [[0, -1],[1, 0],[0, 1],[-1, 0]];
         return getCellsOnGrid(id, grid);
     };
 
@@ -203,7 +203,7 @@ var Field = new function () {
 
     this.getEmptyNeigbors = function(id) {
         var result = [];
-        var nbrs = m_this.getAllNeigbors(id);
+        var nbrs = m_this.getNearNeigbors(id);
         for(var i = 0; i < nbrs.length; i++) {
             if(nbrs[i].isEmpty()) {
                 result.push(nbrs[i]);
@@ -259,9 +259,9 @@ var Field = new function () {
 
     this.getPlantCells = function () {
         var result = new Array();
-        for (var i = 0; i < _cells.length; i++) {
-            if (_cells[i].contains() instanceof Plant) {
-                result.push(_cells[i]);
+        for (var k in _cells) {
+            if (_cells.hasOwnProperty(k) && _cells[k].is(ElementType.PLANT)) {
+                result.push(_cells[k]);
             }
         }
         return result;
@@ -270,7 +270,7 @@ var Field = new function () {
     this.getWeedCells = function () {
         var result = new Array();
         for (var k in _cells) {
-            if (_cells.hasOwnProperty(k) && _cells[k].contains() && _cells[k].contains().is(ElementType.WEED)) {
+            if (_cells.hasOwnProperty(k) && _cells[k].contains() && _cells[k].is(ElementType.WEED)) {
                 result.push(_cells[k]);
             }
         }
@@ -467,6 +467,20 @@ var Field = new function () {
         return result;
     };
 
+    this.encounter = function(id1, id2) {
+        return m_this.getCellValue(_cells[id1]) > m_this.getCellValue(_cells[id2]);
+    };
+
+    this.sortByElement = function(a, b) {
+        if(a.contains() === b.contains()) { return 0; }
+        
+        if(a.is(ElementType.SEED) || b.is(ElementType.FRUIT)) { return -1; }
+        if(a.is(ElementType.FRUIT) || b.is(ElementType.SEED)) { return 1; }
+
+        if(a.is(ElementType.WEED_SMALL) || b.is(ElementType.WEED_LARGE)) { return -1; }
+        if(a.is(ElementType.WEED_LARGE) || b.is(ElementType.WEED_SMALL)) { return 1; }
+    };
+
     _init();
 };
 
@@ -500,6 +514,11 @@ function Cell(cX, cY, elem) {
         }
         tryGrow();
     }
+
+    this.is = function(type) {
+        if(_elem == null) { return false; }
+        return _elem.is(type);
+    };
 
     this.fill = function (elem) {
         if (!(elem instanceof Element)) {
@@ -551,7 +570,9 @@ function Cell(cX, cY, elem) {
         if(elem !== null) {
             _elem = elem;
             View.fillCell(_id, elem);
+            return true;
         }
+        return false;
     };
     
     this.slice = function() {
@@ -596,7 +617,6 @@ function Element(types, name, next, growSpeed, value) {
         return 'img/' + size + '/' + name.toLowerCase().replace(/ /g, '-') + '.png';
     };
 
-
     this.help = function () {
         --movesToGrow;
     };
@@ -616,7 +636,7 @@ function Fruit() {
 }
 
 function Weed_small() {
-    return new Element([ElementType.WEED, ElementType.WEED_SMALL], 'Weed Small', Weed_medium, 4, 12);
+    return new Element([ElementType.WEED, ElementType.WEED_SMALL], 'Weed Small', Weed_medium, 1, 12);
 }
 function Weed_medium() {
     return new Element([ElementType.WEED, ElementType.WEED_MEDIUM], 'Weed Medium', Weed_large, 6, 30);
@@ -685,26 +705,20 @@ var Core = new function () {
     }
 
     function growAll() {
-        if (_whoMoves === PlayerType.PLAYER) {
-            var cells = Field.getPlantCells();
-            cells.shuffle();
-            for (var i = 0; i < cells.length; i++) {
-                setTimeout(function () {
-                    cells[i].tryGrow();
-                    View.refreshCell(cells[i]);
-                }, 150);
+        var growInterval = null;
+        var i = 0;
+        
+        var cells = (m_this.playerMoves()) ? Field.getPlantCells() : Field.getWeedCells();
+        cells.shuffle();
+        
+        growInterval = setInterval(function () {
+            if(i == cells.length) {
+                clearInterval(growInterval);
+                growInterval = null;
+                return;
             }
-        }
-        else if (_whoMoves === PlayerType.CPU) {
-            var cells = Field.getWeedCells();
-            cells.shuffle();
-            for (var i = 0; i < cells.length; i++) {
-                setTimeout(function () {
-                    cells[i].tryGrow();
-                    View.refreshCell(cells[i]);
-                }, 150);
-            }
-        }
+            while(i != cells.length && !cells[i++].tryGrow());
+        }, 75);
     }
 
     function goodLuck() {
@@ -806,11 +820,20 @@ var Core = new function () {
         Field.cellClicked(id);
     };
 
+    this.encounter = function(id1, id2) {
+        return Field.encounter(id1, id2);
+    };
+
     this.destroy = function() {
         View.destroy();
     };
-
     
+    this.increaseScore = function(value) {
+        if(value > 0) {
+            Score += value;
+            View.refreshScore();
+        }
+    };
 };
 
 var EventsManager = new function() {
@@ -902,7 +925,7 @@ var View = new function () {
         var _selectTimeout = null;
         var _neigbors = null;
 
-        $(document).on(EventsManager.get('click'), '.fieldCell', function (event) {
+        $('.fieldCell').on(EventsManager.get('click'), function (event) {
             
             if(!Core.playerMoves()) { return; }
             
@@ -924,11 +947,12 @@ var View = new function () {
                                 $('.fieldCell').removeClass('selected').removeClass('selectedPrimary');
                                 for(var i = 0; i < _selectedCells.length; i++) {
                                     var cell = _selectedCells[i];
-                                    if(i === 0 && cell.contains().is(ElementType.SEED)) { 
+                                    if(i === 0 && cell.is(ElementType.SEED)) { 
                                         cell.clear();
                                         continue; 
                                     }
                                     cell.fill(new Seed());
+                                    Core.increaseScore(150);
                                 }
                                 _selectedType = null;
                                 _selectCount = 0;
@@ -1069,6 +1093,10 @@ var View = new function () {
         
     };
 
+    this.refreshScore = function() {
+        $('#scoreLabel').text(Score);
+    };
+
     this.destroy = function() {
         _eventsOff();
         $('body').find('*:not(#messageBar)').remove();
@@ -1165,7 +1193,7 @@ var GameInfo = new function () {
         return 'Grand Harvest';
     };
     this.version = function () {
-        return '0.0.8';
+        return '0.0.9';
     };
 };
 });
